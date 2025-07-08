@@ -204,18 +204,66 @@ class Score:
         self.image = self.font.render(f"Score: {self.value}", 0, self.color)
         screen.blit(self.image, self.rect)
 
+class Time:
+    def __init__(self, total_time=60):
+        self.start_ticks = pg.time.get_ticks()
+        self.total_time = total_time
+        self.font = pg.font.Font(None, 50)
+        self.color = (255, 255, 255)
+        self.rect = pg.Rect(30,30,100,50)
+
+    def get_time_left(self):
+        elapsed_sec = (pg.time.get_ticks() - self.start_ticks) // 1000
+        return max(0, self.total_time - elapsed_sec)
+
+    def update(self, screen: pg.Surface):
+        time_left = self.get_time_left()
+        txt = self.font.render(f"{time_left}", True, self.color)
+        screen.blit(txt, self.rect)
+
+    def is_time_over(self):
+        return self.get_time_left() <= 0
+
+
+class TimeBird(pg.sprite.Sprite):
+    """
+    時間増減用のめじろう（2: +2秒, 3: -5秒）を表すクラス
+    """
+    def __init__(self, kind: int):
+        super().__init__()
+        self.kind = kind  # 2 or 3
+        img_path = f"fig/mejirou{kind}.png"
+        self.image = pg.transform.rotozoom(pg.image.load(img_path), 0, 0.05)
+        self.rect = self.image.get_rect()
+        self.rect.center = (
+            random.randint(50, WIDTH - 50),
+            random.randint(50, HEIGHT - 50)
+        )
+        self.spawn_time = pg.time.get_ticks()
+
+    def update(self):
+        # 出現から5秒経過で自動消滅
+        if (pg.time.get_ticks() - self.spawn_time) >= 5000:
+            self.kill()
+
+
+
 
 def main():
     pg.display.set_caption("詰む積む")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
     bg_img = pg.image.load(f"fig/haikei.png")
     score = Score()
-
+    time_birds = pg.sprite.Group()
+    timer = Time(60)  # 60秒スタートのタイマー  
     bird = Bird(3, (900, 400))
     bombs = pg.sprite.Group()
     beams = pg.sprite.Group()
     exps = pg.sprite.Group()
     emys = pg.sprite.Group()
+
+    
+
 
     tmr = 0
     clock = pg.time.Clock()
@@ -231,23 +279,42 @@ def main():
         if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
             emys.add(Enemy())
 
-        for emy in emys:
-            if emy.state == "stop" and tmr%emy.interval == 0:
-                # 敵機が停止状態に入ったら，intervalに応じて爆弾投下
-                bombs.add(Bomb(emy, bird))
+        if tmr%300 == 0:  # 約6秒ごと（50fps基準）
+            kind = random.choice([2, 3])
+            time_birds.add(TimeBird(kind))
+
+
+        # for emy in emys:
+        #     if emy.state == "stop" and tmr%emy.interval == 0:
+        #         # 敵機が停止状態に入ったら，intervalに応じて爆弾投下
+        #         bombs.add(Bomb(emy, bird))
 
         for emy in pg.sprite.groupcollide(emys, beams, True, True).keys():  # ビームと衝突した敵機リスト
             exps.add(Explosion(emy, 100))  # 爆発エフェクト
             score.value += 10  # 10点アップ
             bird.change_img(6, screen)  # めじろう喜びエフェクト
 
-        for bomb in pg.sprite.groupcollide(bombs, beams, True, True).keys():  # ビームと衝突した爆弾リスト
-            exps.add(Explosion(bomb, 50))  # 爆発エフェクト
-            score.value += 1  # 1点アップ
+        # for bomb in pg.sprite.groupcollide(bombs, beams, True, True).keys():  # ビームと衝突した爆弾リスト
+        #     exps.add(Explosion(bomb, 50))  # 爆発エフェクト
+        #     score.value += 1  # 1点アップ
+
+        for tbird in pg.sprite.groupcollide(time_birds, beams, True, True).keys():
+            if tbird.kind == 3:
+                timer.total_time += 40
+            elif tbird.kind == 2:
+                timer.total_time -= 5
+
+        # for bird in pg.sprite.groupcollide(time_birds, beams, True, True).keys():
+        #     if bird.kind == 2:
+        #         timer.total_time += 2
+        #     elif bird.kind == 3:
+        #         timer.total_time -= 5
+
 
         for bomb in pg.sprite.spritecollide(bird, bombs, True):  # めじろうと衝突した爆弾リスト
             bird.change_img(8, screen)  # めじろう悲しみエフェクト
             score.update(screen)
+            timer.update(screen)
             pg.display.update()
             time.sleep(2)
             return
@@ -255,6 +322,9 @@ def main():
         bird.update(key_lst, screen)
         beams.update()
         beams.draw(screen)
+        time_birds.update()
+        time_birds.draw(screen)
+
         emys.update()
         emys.draw(screen)
         bombs.update()
@@ -262,7 +332,18 @@ def main():
         exps.update()
         exps.draw(screen)
         score.update(screen)
+        timer.update(screen)
         pg.display.update()
+        if timer.is_time_over():
+        # 終了画面の描画
+            font_big = pg.font.Font(None, 100)
+            font_small = pg.font.Font(None, 60)
+            score_text = font_big.render(f"Score: {score.value}", True, (255, 20, 10))
+            screen.blit(score_text, score_text.get_rect(center=(WIDTH//2, HEIGHT//2 + 50)))
+            pg.display.update()
+            time.sleep(5)
+            return
+
         tmr += 1
         clock.tick(50)
 
