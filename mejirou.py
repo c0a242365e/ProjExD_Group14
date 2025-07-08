@@ -208,7 +208,7 @@ class Time:
     def __init__(self, total_time=60):
         self.start_ticks = pg.time.get_ticks()
         self.total_time = total_time
-        self.font = pg.font.Font(None, 50)
+        self.font = pg.font.Font(None, 100)
         self.color = (255, 255, 255)
         self.rect = pg.Rect(30,30,100,50)
 
@@ -279,7 +279,7 @@ def main():
         if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
             emys.add(Enemy())
 
-        if tmr%300 == 0:  # 約6秒ごと（50fps基準）
+        if tmr%150 == 0:  # 約〇秒ごと（50fps基準）
             kind = random.choice([2, 3])
             time_birds.add(TimeBird(kind))
 
@@ -300,7 +300,7 @@ def main():
 
         for tbird in pg.sprite.groupcollide(time_birds, beams, True, True).keys():
             if tbird.kind == 3:
-                timer.total_time += 40
+                timer.total_time += 3
             elif tbird.kind == 2:
                 timer.total_time -= 5
 
