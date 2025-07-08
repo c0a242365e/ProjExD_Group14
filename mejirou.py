@@ -205,12 +205,23 @@ class Score:
         screen.blit(self.image, self.rect)
 
 
+# def main():
+    # pg.display.set_caption("詰む積む")
+    # screen = pg.display.set_mode((WIDTH, HEIGHT))
+    # bg_img = pg.image.load(f"fig/haikei.png")
+    # score = Score()
+
 def main():
     pg.display.set_caption("詰む積む")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
+
+    # スタート画面の表示
+    start = Start(screen)
+    start.run()
+
+    # 以下、ゲーム処理に進む…
     bg_img = pg.image.load(f"fig/haikei.png")
     score = Score()
-
     bird = Bird(3, (900, 400))
     bombs = pg.sprite.Group()
     beams = pg.sprite.Group()
@@ -231,10 +242,10 @@ def main():
         if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
             emys.add(Enemy())
 
-        for emy in emys:
-            if emy.state == "stop" and tmr%emy.interval == 0:
-                # 敵機が停止状態に入ったら，intervalに応じて爆弾投下
-                bombs.add(Bomb(emy, bird))
+        # for emy in emys:
+        #     if emy.state == "stop" and tmr%emy.interval == 0:
+        #         # 敵機が停止状態に入ったら，intervalに応じて爆弾投下
+        #         bombs.add(Bomb(emy, bird))
 
         for emy in pg.sprite.groupcollide(emys, beams, True, True).keys():  # ビームと衝突した敵機リスト
             exps.add(Explosion(emy, 100))  # 爆発エフェクト
@@ -266,9 +277,37 @@ def main():
         tmr += 1
         clock.tick(50)
 
+class Start:
+    """
+    スタート画面を表示するクラス。
+    背景に指定画像を表示し、Enterキーでスタートする。
+    """
+    def __init__(self, screen: pg.Surface):
+        self.screen = screen
+        self.bg_img = pg.image.load("vs.jpg")  # アップロード画像を読み込む
+        self.bg_img = pg.transform.scale(self.bg_img, (WIDTH, HEIGHT))  # 画面サイズにリサイズ
+        self.font = pg.font.Font(None, 60)
+        self.text = self.font.render("Press ENTER to Start", True, (255, 0, 0))
+        self.text_rect = self.text.get_rect(center=(WIDTH // 2, HEIGHT - 100))
+
+    def run(self):
+        while True:
+            self.screen.blit(self.bg_img, (0, 0))
+            self.screen.blit(self.text, self.text_rect)
+            pg.display.update()
+
+            for event in pg.event.get():
+                if event.type == pg.QUIT:
+                    pg.quit()
+                    sys.exit()
+                if event.type == pg.KEYDOWN and event.key == pg.K_RETURN:
+                    return
+
 
 if __name__ == "__main__":
     pg.init()
     main()
     pg.quit()
     sys.exit()
+
+
