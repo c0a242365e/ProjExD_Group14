@@ -10,7 +10,6 @@ WIDTH = 1100  # ゲームウィンドウの幅
 HEIGHT = 650  # ゲームウィンドウの高さ
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-
 def check_bound(obj_rct: pg.Rect) -> tuple[bool, bool]:
     """
     オブジェクトが画面内or画面外を判定し，真理値タプルを返す関数
@@ -104,21 +103,25 @@ class Beam(pg.sprite.Sprite):
     """
     ビームに関するクラス
     """
-    def __init__(self, bird: Bird):
+    def __init__(self, bird: Bird,angle:float | None = None):
         """
         ビーム画像Surfaceを生成する
         引数 bird：ビームを放つめじろう
         """
         super().__init__()
-        self.vx, self.vy = bird.dire
-        angle = math.degrees(math.atan2(-self.vy, self.vx))
-        self.image = pg.transform.rotozoom(pg.image.load(f"fig/beam.png"), angle, 1.0)
-        self.vx = math.cos(math.radians(angle))
-        self.vy = -math.sin(math.radians(angle))
+        if angle is None:
+            dx,dy = bird.dire
+            angle = math.degrees(math.atan2(-dy, dx))
+            self.vx, self.vy = dx,dy
+        else:
+            self.vx = math.cos(math.radians(angle))
+            self.vy = -math.sin(math.radians(angle))
+        self.image = pg.transform.rotozoom(pg.image.load("fig/beam.png"),angle,1.0)
         self.rect = self.image.get_rect()
-        self.rect.centery = bird.rect.centery+bird.rect.height*self.vy
-        self.rect.centerx = bird.rect.centerx+bird.rect.width*self.vx
-        self.speed = 10
+        self.rect.centerx = bird.rect.centerx + bird.rect.width * self.vx
+        self.rect.centery = bird.rect.centery + bird.rect.height * self.vy
+        self.speed = 12
+        
 
     def update(self):
         """
@@ -205,11 +208,58 @@ class Score:
         screen.blit(self.image, self.rect)
 
 
+class NeoBeam:
+    def __init__(self, bird: Bird, num: int = 5):
+        """
+        bird: こうかとん（ビームを撃つやつ）
+        num: 発射するビームの数（奇数推奨）
+        """
+        self.bird = bird
+        self.num = max(1,num)
+
+    def gen_beams(self) -> list[Beam]:
+        """
+        ビーム角度をずらしながら Beam インスタンスをリストで返す
+        """
+
+        step = 360 / self.num 
+        return [Beam(self.bird, angle) 
+                for angle in (i * step for i in range(self.num))]
+
+class Skill:
+    """
+    敵を倒すとスキルゲージがたまり、拡散ビームを打つ
+    """
+    def __init__(self,max_value: int = 5):
+        self.value = 0
+        self.max = max_value
+        self.bar_area = pg.Rect(WIDTH-250,HEIGHT-40,200,15)
+        self.font = pg.font.Font(None,30)
+
+    def add(self,n:int = 1):
+        self.value = min(self.max,self.value + n)
+    
+    def ready(self) -> bool:
+        return self.value >= self.max
+    
+    def consume(self):
+        self.value = 0
+
+    def draw(self, screen:pg.surface):
+        pg.draw.rect(screen, (200,200,200),self.bar_area,2)
+        inner = self.bar_area.copy()
+        inner.width = self.bar_area.width*self.value/self.max
+        pg.draw.rect(screen,(255,215,0),inner)
+        txt = self.font.render(f"skill{self.value}/{self.max}" ,True,(255,215,0))
+        screen.blit(txt,(self.bar_area.x,self.bar_area.y -22))
+
+
 def main():
     pg.display.set_caption("詰む積む")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
     bg_img = pg.image.load(f"fig/haikei.png")
     score = Score()
+    skill = Skill()
 
     bird = Bird(3, (900, 400))
     bombs = pg.sprite.Group()
@@ -225,20 +275,29 @@ def main():
             if event.type == pg.QUIT:
                 return 0
             if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
-                beams.add(Beam(bird))
+                # beams.add(Beam(bird))
+                if event.key == pg.K_SPACE and  skill.ready():
+                    # beams.add(Beam(bird))  # 通常ビーム
+                    for b in NeoBeam(bird, num = 32).gen_beams():   # 32方向にビームを放つ
+                        beams.add(b)
+                    skill.consume()
+                else:
+                    beams.add(Beam(bird))
+
         screen.blit(bg_img, [0, 0])
 
         if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
             emys.add(Enemy())
 
-        for emy in emys:
-            if emy.state == "stop" and tmr%emy.interval == 0:
-                # 敵機が停止状態に入ったら，intervalに応じて爆弾投下
-                bombs.add(Bomb(emy, bird))
+        # for emy in emys:
+        #     if emy.state == "stop" and tmr%emy.interval == 0:
+        #         # 敵機が停止状態に入ったら，intervalに応じて爆弾投下
+        #         # bombs.add(Bomb(emy, bird))
 
         for emy in pg.sprite.groupcollide(emys, beams, True, True).keys():  # ビームと衝突した敵機リスト
             exps.add(Explosion(emy, 100))  # 爆発エフェクト
             score.value += 10  # 10点アップ
+            skill.add()
             bird.change_img(6, screen)  # めじろう喜びエフェクト
 
         for bomb in pg.sprite.groupcollide(bombs, beams, True, True).keys():  # ビームと衝突した爆弾リスト
@@ -262,6 +321,7 @@ def main():
         exps.update()
         exps.draw(screen)
         score.update(screen)
+        skill.draw(screen)
         pg.display.update()
         tmr += 1
         clock.tick(50)
