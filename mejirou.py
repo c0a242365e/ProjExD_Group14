@@ -36,6 +36,34 @@ def calc_orientation(org: pg.Rect, dst: pg.Rect) -> tuple[float, float]:
     return x_diff/norm, y_diff/norm
 
 
+class Start:
+    """
+    スタート画面を表示するクラス。
+    背景に指定画像を表示し、Enterキーでスタートする。
+
+    """
+    def __init__(self, screen: pg.Surface):
+        self.screen = screen
+        self.bg_img = pg.image.load("vs.jpg")  # アップロード画像を読み込む
+        self.bg_img = pg.transform.scale(self.bg_img, (WIDTH, HEIGHT))  # 画面サイズにリサイズ
+        self.font = pg.font.Font(None, 60)
+        self.text = self.font.render("Press ENTER to Start", True, (255, 0, 0))
+        self.text_rect = self.text.get_rect(center=(WIDTH // 2, HEIGHT - 100))
+
+    def run(self):
+        while True:
+            self.screen.blit(self.bg_img, (0, 0))
+            self.screen.blit(self.text, self.text_rect)
+            pg.display.update()
+
+            for event in pg.event.get():
+                if event.type == pg.QUIT:
+                    pg.quit()
+                    sys.exit()
+                if event.type == pg.KEYDOWN and event.key == pg.K_RETURN:
+                    return
+
+
 class Bird(pg.sprite.Sprite):
     """
     ゲームキャラクター（めじろう）に関するクラス
@@ -345,9 +373,21 @@ class Skill:
         screen.blit(txt,(self.bar_area.x,self.bar_area.y -22))  # テキストをゲージの上に表示
 
 
+# def main():
+    # pg.display.set_caption("詰む積む")
+    # screen = pg.display.set_mode((WIDTH, HEIGHT))
+    # bg_img = pg.image.load(f"fig/haikei.png")
+    # score = Score()
+
 def main():
     pg.display.set_caption("詰む積む")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
+
+    # スタート画面の表示
+    start = Start(screen)
+    start.run()
+
+    # 以下、ゲーム処理に進む…
     bg_img = pg.image.load(f"fig/haikei.png")
     score = Score()
     time_birds = pg.sprite.Group()
@@ -387,6 +427,10 @@ def main():
         if tmr%150 == 0:  # 約〇秒ごと（50fps基準）
             kind = random.choice([2, 3])
             time_birds.add(TimeBird(kind))
+        # for emy in emys:
+        #     if emy.state == "stop" and tmr%emy.interval == 0:
+        #         # 敵機が停止状態に入ったら，intervalに応じて爆弾投下
+        #         bombs.add(Bomb(emy, bird))
 
 
         # for emy in emys:
@@ -428,8 +472,17 @@ def main():
             score.update(screen)
             timer.update(screen)
             pg.display.update()
-            time.sleep(2)
-            return
+            time.sleep(1)
+            # 終了スコア表示
+            font_big = pg.font.Font(None, 100)
+            font_small = pg.font.Font(None, 60)
+            score_text = font_big.render(f"Score: {score.value}", True, (255, 20, 10))
+            screen.blit(score_text, score_text.get_rect(center=(WIDTH//2, HEIGHT//2 + 50)))
+            pg.display.update()
+            time.sleep(5)
+            return   
+
+    
 
         bird.update(key_lst, screen)
         beams.update()
@@ -449,9 +502,9 @@ def main():
         pg.display.update()
         if timer.is_time_over():
         # 終了画面の描画
-            font_big = pg.font.Font(None, 100)
-            font_small = pg.font.Font(None, 60)
-            score_text = font_big.render(f"Score: {score.value}", True, (255, 20, 10))
+            font = pg.font.Font(None, 100)
+            # font_small = pg.font.Font(None, 60)
+            score_text = font.render(f"Score: {score.value}", True, (255, 20, 10))
             screen.blit(score_text, score_text.get_rect(center=(WIDTH//2, HEIGHT//2 + 50)))
             pg.display.update()
             time.sleep(5)
@@ -466,3 +519,5 @@ if __name__ == "__main__":
     main()
     pg.quit()
     sys.exit()
+
+
