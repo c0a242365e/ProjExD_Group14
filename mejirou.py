@@ -274,12 +274,12 @@ def main():
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 return 0
-            if event.type == pg.KEYDOWN and event.key == pg.K_SPACE: # スペースキーが押されたら
-                if event.key == pg.K_SPACE and  skill.ready(): # スキルゲージが満タンなら  
+            if event.type == pg.KEYDOWN: # スペースキーが押されたら
+                if event.key == pg.K_RETURN and  skill.ready(): # スキルゲージが満タンなら Enterキーで発動
                     for b in NeoBeam(bird, num = 32).gen_beams():   # 32方向にビームを放つ
                         beams.add(b) # 各ビームをビームグループに追加
                     skill.consume() # スキルゲージを消費
-                else: #スキルゲージがたまっていなければ
+                elif event.key == pg.K_SPACE: #スキルゲージがたまっていなければ
                     beams.add(Beam(bird)) # 通常ビームを1発だけ追加
 
         screen.blit(bg_img, [0, 0])
