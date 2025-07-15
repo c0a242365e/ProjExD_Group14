@@ -215,7 +215,7 @@ class NeoBeam:
         num: 発射するビームの数（奇数推奨）
         """
         self.bird = bird
-        self.num = max(1,num)
+        self.num = max(1,num) #ビームを最低でも一本出し、numの数に応じて最大本数が変わる
 
     def gen_beams(self) -> list[Beam]:
         """
@@ -224,34 +224,34 @@ class NeoBeam:
 
         step = 360 / self.num 
         return [Beam(self.bird, angle) 
-                for angle in (i * step for i in range(self.num))]
+                for angle in (i * step for i in range(self.num))] # i を 0〜(self.num-1) まで増やし、step をかけて angle を求める
 
 class Skill:
     """
     敵を倒すとスキルゲージがたまり、拡散ビームを打つ
     """
     def __init__(self,max_value: int = 5):
-        self.value = 0
-        self.max = max_value
-        self.bar_area = pg.Rect(WIDTH-250,HEIGHT-40,200,15)
-        self.font = pg.font.Font(None,30)
+        self.value = 0 
+        self.max = max_value #最大スキルポイント
+        self.bar_area = pg.Rect(WIDTH-250,HEIGHT-40,200,15) # スキルゲージを表示するための長方形
+        self.font = pg.font.Font(None,30) #スキルゲージの文字フォント
 
-    def add(self,n:int = 1):
-        self.value = min(self.max,self.value + n)
+    def add(self,n:int = 1): #増やすスキルポイント 敵を倒した際のスキルポイント
+        self.value = min(self.max,self.value + n) # 最大値を超えないように加算
     
     def ready(self) -> bool:
-        return self.value >= self.max
+        return self.value >= self.max # スキルを発動できる状態か（満タンならTrue）
     
     def consume(self):
-        self.value = 0
+        self.value = 0 # スキルを使った際スキルポイントを0にする
 
-    def draw(self, screen:pg.surface):
-        pg.draw.rect(screen, (200,200,200),self.bar_area,2)
-        inner = self.bar_area.copy()
-        inner.width = self.bar_area.width*self.value/self.max
-        pg.draw.rect(screen,(255,215,0),inner)
-        txt = self.font.render(f"skill{self.value}/{self.max}" ,True,(255,215,0))
-        screen.blit(txt,(self.bar_area.x,self.bar_area.y -22))
+    def draw(self, screen:pg.surface): # スキルゲージを画面に描画する処理
+        pg.draw.rect(screen, (255,0,0),self.bar_area,2) # ゲージの枠（レッド）を描く
+        inner = self.bar_area.copy() # 枠と同じサイズの中身を作成
+        inner.width = self.bar_area.width*self.value/self.max # ゲージの中身の長さを現在の値に応じて設定
+        pg.draw.rect(screen,(255,215,0),inner) # ゲージの中身の色を描画
+        txt = self.font.render(f"skill{self.value}/{self.max}" ,True,(255,215,0)) # ゲージ上部に表示するテキストを描画（例：skill 3/5）
+        screen.blit(txt,(self.bar_area.x,self.bar_area.y -22)) # テキストをゲージの上に表示
 
 
 def main():
@@ -274,25 +274,18 @@ def main():
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 return 0
-            if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
-                # beams.add(Beam(bird))
-                if event.key == pg.K_SPACE and  skill.ready():
-                    # beams.add(Beam(bird))  # 通常ビーム
+            if event.type == pg.KEYDOWN and event.key == pg.K_SPACE: # スペースキーが押されたら
+                if event.key == pg.K_SPACE and  skill.ready(): # スキルゲージが満タンなら  
                     for b in NeoBeam(bird, num = 32).gen_beams():   # 32方向にビームを放つ
-                        beams.add(b)
-                    skill.consume()
-                else:
-                    beams.add(Beam(bird))
+                        beams.add(b) # 各ビームをビームグループに追加
+                    skill.consume() # スキルゲージを消費
+                else: #スキルゲージがたまっていなければ
+                    beams.add(Beam(bird)) # 通常ビームを1発だけ追加
 
         screen.blit(bg_img, [0, 0])
 
         if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
             emys.add(Enemy())
-
-        # for emy in emys:
-        #     if emy.state == "stop" and tmr%emy.interval == 0:
-        #         # 敵機が停止状態に入ったら，intervalに応じて爆弾投下
-        #         # bombs.add(Bomb(emy, bird))
 
         for emy in pg.sprite.groupcollide(emys, beams, True, True).keys():  # ビームと衝突した敵機リスト
             exps.add(Explosion(emy, 100))  # 爆発エフェクト
