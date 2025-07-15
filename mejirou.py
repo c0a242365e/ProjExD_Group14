@@ -44,7 +44,7 @@ class Start:
     """
     def __init__(self, screen: pg.Surface):
         self.screen = screen
-        self.bg_img = pg.image.load("vs.jpg")  # アップロード画像を読み込む
+        self.bg_img = pg.image.load("fig/vs.jpg")  # アップロード画像を読み込む
         self.bg_img = pg.transform.scale(self.bg_img, (WIDTH, HEIGHT))  # 画面サイズにリサイズ
         self.font = pg.font.Font(None, 60)
         self.text = self.font.render("Press ENTER to Start", True, (255, 0, 0))
