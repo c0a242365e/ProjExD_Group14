@@ -10,7 +10,6 @@ WIDTH = 1100  # ゲームウィンドウの幅
 HEIGHT = 650  # ゲームウィンドウの高さ
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-
 def check_bound(obj_rct: pg.Rect) -> tuple[bool, bool]:
     """
     オブジェクトが画面内or画面外を判定し，真理値タプルを返す関数
@@ -145,21 +144,25 @@ class Beam(pg.sprite.Sprite):
     """
     ビームに関するクラス
     """
-    def __init__(self, bird: Bird):
+    def __init__(self, bird: Bird,angle:float | None = None):
         """
         ビーム画像Surfaceを生成する
         引数 bird：ビームを放つめじろう
         """
         super().__init__()
-        self.vx, self.vy = bird.dire
-        angle = math.degrees(math.atan2(-self.vy, self.vx))
-        self.image = pg.transform.rotozoom(pg.image.load(f"fig/beam.png"), angle, 1.0)
-        self.vx = math.cos(math.radians(angle))
-        self.vy = -math.sin(math.radians(angle))
+        if angle is None:  # 角度が指定されていないとき
+            dx,dy = bird.dire  # めいじろうの向き取得
+            angle = math.degrees(math.atan2(-dy, dx))  # めいじろうの向きから角度を計算
+            self.vx, self.vy = dx,dy  # ビームの移動方向をセット
+        else:
+            self.vx = math.cos(math.radians(angle))  # x方向の速度
+            self.vy = -math.sin(math.radians(angle))  # y方向の速度
+        self.image = pg.transform.rotozoom(pg.image.load("fig/beam.png"),angle,1.0)  # ビームの画像を角度に合わせて回転
         self.rect = self.image.get_rect()
-        self.rect.centery = bird.rect.centery+bird.rect.height*self.vy
-        self.rect.centerx = bird.rect.centerx+bird.rect.width*self.vx
-        self.speed = 10
+        self.rect.centerx = bird.rect.centerx + bird.rect.width * self.vx  # ビームの初期x座標の調整
+        self.rect.centery = bird.rect.centery + bird.rect.height * self.vy  # ビームの初期y座標の調整
+        self.speed = 12  # ビームの移動速度
+        
 
     def update(self):
         """
@@ -167,8 +170,8 @@ class Beam(pg.sprite.Sprite):
         引数 screen：画面Surface
         """
         self.rect.move_ip(self.speed*self.vx, self.speed*self.vy)
-        if check_bound(self.rect) != (True, True):
-            self.kill()
+        if check_bound(self.rect) != (True, True):  # 画面外に出たら
+            self.kill()  # ビームを削除
 
 
 class Explosion(pg.sprite.Sprite):
@@ -296,6 +299,52 @@ class TimeBird(pg.sprite.Sprite):
 
 
 
+class NeoBeam:
+    def __init__(self, bird: Bird, num: int = 5):
+        """
+        bird: こうかとん（ビームを撃つやつ）
+        num: 発射するビームの数（奇数推奨）
+        """
+        self.bird = bird
+        self.num = max(1,num) #ビームを最低でも一本出し、numの数に応じて最大本数が変わる
+
+    def gen_beams(self) -> list[Beam]:
+        """
+        ビーム角度をずらしながら Beam インスタンスをリストで返す
+        """
+
+        step = 360 / self.num 
+        return [Beam(self.bird, angle) 
+                for angle in (i * step for i in range(self.num))] # i を 0〜(self.num-1) まで増やし、step をかけて angle を求める
+
+class Skill:
+    """
+    敵を倒すとスキルゲージがたまり、拡散ビームを打つ
+    """
+    def __init__(self,max_value: int = 5):
+        self.value = 0 
+        self.max = max_value  # 最大スキルポイント
+        self.bar_area = pg.Rect(WIDTH-250,HEIGHT-40,200,15)  # スキルゲージを表示するための長方形
+        self.font = pg.font.Font(None,30)  # スキルゲージの文字フォント
+
+    def add(self,n:int = 1):  # 増やすスキルポイント 敵を倒した際のスキルポイント
+        self.value = min(self.max,self.value + n)  # 最大値を超えないように加算
+    
+    def ready(self) -> bool:
+        return self.value >= self.max  # スキルを発動できる状態か（満タンならTrue）
+    
+    def consume(self):
+        self.value = 0  # スキルを使った際スキルポイントを0にする
+
+    def draw(self, screen: pg.Surface):  # スキルゲージを画面に描画する処理
+        pg.draw.rect(screen, (255,0,0),self.bar_area,2)  # ゲージの枠（レッド）を描く
+        inner = self.bar_area.copy()  # 枠と同じサイズの中身を作成
+        inner.width = self.bar_area.width*self.value/self.max  # ゲージの中身の長さを現在の値に応じて設定
+        pg.draw.rect(screen,(255,215,0),inner)  # ゲージの中身の色を描画
+        txt = self.font.render(f"skill{self.value}/{self.max}" ,True,(255,215,0))  # ゲージ上部に表示するテキストを描画（例：skill 3/5）
+        screen.blit(txt,(self.bar_area.x,self.bar_area.y -22))  # テキストをゲージの上に表示
+
+
 def main():
     pg.display.set_caption("詰む積む")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
@@ -303,26 +352,31 @@ def main():
     score = Score()
     time_birds = pg.sprite.Group()
     timer = Time(60)  # 60秒スタートのタイマー  
+    skill = Skill()
+
     bird = Bird(3, (900, 400))
     bombs = pg.sprite.Group()
     beams = pg.sprite.Group()
     exps = pg.sprite.Group()
     emys = pg.sprite.Group()
 
-    
-
 
     tmr = 0
-    clock = pg.time.Clock()
+    clock = pg.time.Clock()        
     while True:
         key_lst = pg.key.get_pressed()
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 return 0
-            if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
-                beams.add(Beam(bird))
-        screen.blit(bg_img, [0, 0])
+            if event.type == pg.KEYDOWN: # スペースキーが押されたら
+                if event.key == pg.K_RETURN and  skill.ready(): # スキルゲージが満タンなら Enterキーで発動
+                    for b in NeoBeam(bird, num = 32).gen_beams():   # 32方向にビームを放つ
+                        beams.add(b) # 各ビームをビームグループに追加
+                    skill.consume() # スキルゲージを消費
+                elif event.key == pg.K_SPACE: #スキルゲージがたまっていなければ
+                    beams.add(Beam(bird)) # 通常ビームを1発だけ追加
 
+        screen.blit(bg_img, [0, 0])
         if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
             emys.add(Enemy())
 
@@ -340,9 +394,13 @@ def main():
         #         # 敵機が停止状態に入ったら，intervalに応じて爆弾投下
         #         bombs.add(Bomb(emy, bird))
 
-        for emy in pg.sprite.groupcollide(emys, beams, True, True).keys():  # ビームと衝突したこうかとんリスト
+        # for emy in pg.sprite.groupcollide(emys, beams, True, True).keys():  # ビームと衝突したこうかとんリスト
+        #     exps.add(Explosion(emy, 100))  # 爆発エフェクト
+        #     score.value += emy.score_value  # 点アップ
+        for emy in pg.sprite.groupcollide(emys, beams, True, True).keys():  # ビームと衝突した敵機リスト
             exps.add(Explosion(emy, 100))  # 爆発エフェクト
-            score.value += emy.score_value  # 点アップ
+            score.value += emy.score_value  # こうかとんの大きさで点アップ
+            skill.add()
             bird.change_img(6, screen)  # めじろう喜びエフェクト
 
         for bomb in pg.sprite.groupcollide(bombs, beams, True, True).keys():  # ビームと衝突した爆弾こうかとんリスト
@@ -387,6 +445,7 @@ def main():
         exps.draw(screen)
         score.update(screen)
         timer.update(screen)
+        skill.draw(screen)
         pg.display.update()
         if timer.is_time_over():
         # 終了画面の描画
